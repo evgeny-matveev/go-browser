@@ -24,43 +24,23 @@ func Request(url urlparser.URL) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer conn.Close()
 
-	request := fmt.Sprintf("GET %s HTTP/1.0\r\n", url.Path)
-	request += fmt.Sprintf("Host: %s\r\n", url.Host)
-	request += "\r\n"
+	request := prepareGetRequest(url.Path, url.Host)
 
-	_, err = conn.Write([]byte(request))
-	if err != nil {
+	if _, err := conn.Write(request); err != nil {
 		return "", err
 	}
 
 	reader := bufio.NewReader(conn)
 
-	statusLine, err := readLine(reader)
-	if err != nil {
+	if err := handleStatus(reader); err != nil {
 		return "", err
-	}
-	status, err := parseStatus(statusLine)
-	if err != nil {
-		return "", err
-	}
-	// TODO: handle statuses
-	if status.Code != 200 {
-		return "", fmt.Errorf("unsupported status: %d %s", status.Code, status.Explanation)
 	}
 
-	headers, err := parseHeaders(reader)
-	if err != nil {
+	if err := handleHeaders(reader); err != nil {
 		return "", err
-	}
-	if len(headers) > 0 {
-		if _, ok := headers["transfer-encoding"]; ok {
-			return "", errors.New("cannot handle response: transfer-encoding is not supported")
-		}
-		if _, ok := headers["content-encoding"]; ok {
-			return "", errors.New("cannot handle response: content-encoding is not supported")
-		}
 	}
 
 	content, err := io.ReadAll(reader)
@@ -69,6 +49,32 @@ func Request(url urlparser.URL) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func prepareGetRequest(path string, host string) []byte {
+	request := fmt.Sprintf("GET %s HTTP/1.0\r\n", path)
+	request += fmt.Sprintf("Host: %s\r\n", host)
+	request += "\r\n"
+	return []byte(request)
+}
+
+func handleStatus(reader *bufio.Reader) error {
+	statusLine, err := readLine(reader)
+	if err != nil {
+		return err
+	}
+
+	status, err := parseStatus(statusLine)
+	if err != nil {
+		return err
+	}
+
+	// TODO: handle statuses
+	if status.Code != 200 {
+		return fmt.Errorf("unsupported status: %d %s", status.Code, status.Explanation)
+	}
+
+	return nil
 }
 
 func readLine(reader *bufio.Reader) (string, error) {
@@ -98,6 +104,25 @@ func parseStatus(line string) (Status, error) {
 		Code:        code,
 		Explanation: parts[2],
 	}, nil
+}
+
+func handleHeaders(reader *bufio.Reader) error {
+	headers, err := parseHeaders(reader)
+	if err != nil {
+		return err
+	}
+
+	if len(headers) > 0 {
+		if _, ok := headers["transfer-encoding"]; ok {
+			return errors.New("cannot handle response: transfer-encoding is not supported")
+		}
+
+		if _, ok := headers["content-encoding"]; ok {
+			return errors.New("cannot handle response: content-encoding is not supported")
+		}
+	}
+
+	return nil
 }
 
 func parseHeaders(reader *bufio.Reader) (Headers, error) {
