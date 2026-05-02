@@ -19,8 +19,10 @@ type Status struct {
 
 type Headers map[string]string
 
+var dial = net.Dial
+
 func Request(url urlparser.URL) (string, error) {
-	conn, err := net.Dial("tcp", url.Host+":80")
+	conn, err := dial("tcp", url.Host+":80")
 	if err != nil {
 		return "", err
 	}

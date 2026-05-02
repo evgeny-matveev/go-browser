@@ -2,153 +2,115 @@ package httpclient
 
 import (
 	"bufio"
+	"fmt"
+	"gobrowser/internal/urlparser"
+	"net"
 	"strings"
 	"testing"
 )
 
-func TestReadLine(t *testing.T) {
-	validTests := []struct {
-		name    string
-		raw     string
-		want    string
+func TestRequestReturnsSuccessfulResponseBody(t *testing.T) {
+	body, requestLines, err := requestWithResponse(t, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\nHello, browser!")
+	if err != nil {
+		t.Fatalf("Request returned error: %v", err)
+	}
+
+	if body != "Hello, browser!" {
+		t.Fatalf("Request returned body %q, want %q", body, "Hello, browser!")
+	}
+
+	wantRequestLines := []string{
+		"GET /index.html HTTP/1.0",
+		"Host: example.com",
+		"",
+	}
+	if fmt.Sprint(requestLines) != fmt.Sprint(wantRequestLines) {
+		t.Fatalf("Request sent lines %q, want %q", requestLines, wantRequestLines)
+	}
+}
+
+func TestRequestRejectsUnsupportedStatus(t *testing.T) {
+	_, _, err := requestWithResponse(t, "HTTP/1.0 404 Not Found\r\n")
+	if err == nil {
+		t.Fatal("Request expected error for non-200 status, got nil")
+	}
+}
+
+func TestRequestRejectsUnsupportedResponseEncodings(t *testing.T) {
+	tests := []struct {
+		name     string
+		response string
 	}{
 		{
-			name: "reads crlf line",
-			raw:  "hello\r\n",
-			want: "hello",
+			name:     "transfer encoding",
+			response: "HTTP/1.0 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
+		},
+		{
+			name:     "content encoding",
+			response: "HTTP/1.0 200 OK\r\nContent-Encoding: gzip\r\n\r\n",
 		},
 	}
 
-	for _, tt := range validTests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readLine(bufio.NewReader(strings.NewReader(tt.raw)))
-			if err != nil {
-				t.Fatalf("readLine(%q) returned error: %v", tt.raw, err)
-			}
-			if got != tt.want {
-				t.Fatalf("readLine(%q) = %q, want %q", tt.raw, got, tt.want)
-			}
-		})
-	}
-
-	invalidTests := []struct {
-		name string
-		raw  string
-	}{
-		{
-			name: "rejects non crlf line",
-			raw:  "hello\n",
-		},
-	}
-
-	for _, tt := range invalidTests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readLine(bufio.NewReader(strings.NewReader(tt.raw)))
+			_, _, err := requestWithResponse(t, tt.response)
 			if err == nil {
-				t.Fatalf("readLine(%q) expected error, got %q", tt.raw, got)
+				t.Fatal("Request expected error for unsupported response encoding, got nil")
 			}
 		})
 	}
 }
 
-func TestParseStatus(t *testing.T) {
-	validTests := []struct {
-		name    string
-		raw     string
-		want    Status
-	}{
-		{
-			name: "parses valid status",
-			raw:  "HTTP/1.0 200 OK",
-			want: Status{
-				Version:     "HTTP/1.0",
-				Code:        200,
-				Explanation: "OK",
-			},
-		},
+func requestWithResponse(t *testing.T, response string) (string, []string, error) {
+	t.Helper()
+
+	originalDial := dial
+	t.Cleanup(func() {
+		dial = originalDial
+	})
+
+	requestLines := make(chan []string, 1)
+	dial = func(network, address string) (net.Conn, error) {
+		if network != "tcp" {
+			return nil, fmt.Errorf("network = %q, want %q", network, "tcp")
+		}
+		if address != "example.com:80" {
+			return nil, fmt.Errorf("address = %q, want %q", address, "example.com:80")
+		}
+
+		client, server := net.Pipe()
+		go serveResponse(server, response, requestLines)
+		return client, nil
 	}
 
-	for _, tt := range validTests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseStatus(tt.raw)
-			if err != nil {
-				t.Fatalf("parseStatus(%q) returned error: %v", tt.raw, err)
-			}
-			if got != tt.want {
-				t.Fatalf("parseStatus(%q) = %+v, want %+v", tt.raw, got, tt.want)
-			}
-		})
-	}
+	body, err := Request(urlparser.URL{
+		Scheme: "http",
+		Host:   "example.com",
+		Path:   "/index.html",
+	})
 
-	invalidTests := []struct {
-		name string
-		raw  string
-	}{
-		{
-			name: "rejects malformed status",
-			raw:  "HTTP/1.0 OK",
-		},
-	}
-
-	for _, tt := range invalidTests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseStatus(tt.raw)
-			if err == nil {
-				t.Fatalf("parseStatus(%q) expected error, got %+v", tt.raw, got)
-			}
-		})
-	}
+	return body, <-requestLines, err
 }
 
-func TestParseHeaders(t *testing.T) {
-	validTests := []struct {
-		name    string
-		raw     string
-		want    Headers
-	}{
-		{
-			name: "parses headers until empty line",
-			raw:  "Content-Type: text/html\r\nX-Test:  hello \r\n\r\nrest of body",
-			want: Headers{
-				"content-type": "text/html",
-				"x-test":       "hello",
-			},
-		},
+func serveResponse(conn net.Conn, response string, requestLines chan<- []string) {
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	lines := []string{}
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			requestLines <- lines
+			return
+		}
+
+		line = strings.TrimSuffix(line, "\r\n")
+		lines = append(lines, line)
+		if line == "" {
+			break
+		}
 	}
 
-	for _, tt := range validTests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseHeaders(bufio.NewReader(strings.NewReader(tt.raw)))
-			if err != nil {
-				t.Fatalf("parseHeaders(%q) returned error: %v", tt.raw, err)
-			}
-			if len(got) != len(tt.want) {
-				t.Fatalf("parseHeaders(%q) = %+v, want %+v", tt.raw, got, tt.want)
-			}
-			for key, wantValue := range tt.want {
-				if got[key] != wantValue {
-					t.Fatalf("parseHeaders(%q)[%q] = %q, want %q", tt.raw, key, got[key], wantValue)
-				}
-			}
-		})
-	}
-
-	invalidTests := []struct {
-		name string
-		raw  string
-	}{
-		{
-			name: "rejects header without colon",
-			raw:  "Content-Type text/html\r\n\r\n",
-		},
-	}
-
-	for _, tt := range invalidTests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseHeaders(bufio.NewReader(strings.NewReader(tt.raw)))
-			if err == nil {
-				t.Fatalf("parseHeaders(%q) expected error, got %+v", tt.raw, got)
-			}
-		})
-	}
+	requestLines <- lines
+	_, _ = conn.Write([]byte(response))
 }
