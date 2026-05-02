@@ -1,3 +1,3 @@
-module src/telnet
+module gobrowser
 
 go 1.26.2
