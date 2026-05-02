@@ -1,9 +1,9 @@
 {
   "inlay_hints": {
     "show_parameter_hints": false,
-    "show_type_hints": true,
-    "enabled": true,
-    "show_value_hints": true
+    "show_type_hints": false,
+    "enabled": false,
+    "show_value_hints": false
   },
   "tab_size": 4
 }
