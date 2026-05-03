@@ -1,7 +1,0 @@
-interface:
-  display_name: "Git Commit Style"
-  short_description: "Consistent conventional commits"
-  default_prompt: "Use $git-commit-style to split the diff into logical commits and write them in a consistent conventional-commit format."
-
-policy:
-  allow_implicit_invocation: true
