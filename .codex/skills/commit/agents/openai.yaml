@@ -1,0 +1,7 @@
+interface:
+  display_name: "Commit"
+  short_description: "Conventional git commits for this repo"
+  default_prompt: "Use $commit to split the diff into logical commits and write them in a consistent conventional-commit format."
+
+policy:
+  allow_implicit_invocation: true
