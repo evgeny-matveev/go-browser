@@ -5,6 +5,10 @@ description: Use when asked to write a git commit for this repo. The repo-specif
 
 # Commit
 
+When the user asks to commit, inspect the entire working tree and commit all changed files that belong in the repo history. Do not limit yourself to only the files touched by the current conversation.
+
+Split the work into multiple commits grouped by the main behavior or purpose of the change. Do not collapse unrelated work into one commit.
+
 Write commits in this format:
 
 ```text
@@ -17,6 +21,8 @@ type(scope): description
 - Use the `ai` scope only for changes that are actually about AI behavior, AI tooling, or AI-specific repo features.
 - Prefer a single purpose per commit.
 - Keep unrelated changes in separate commits.
+- If there are multiple logical changes in the working tree, stage and commit each group separately.
+- If the diff cannot be cleanly grouped, pause and ask before mixing concerns.
 
 ## Common types
 

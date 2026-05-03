@@ -1,7 +1,7 @@
 interface:
   display_name: "Commit"
   short_description: "Conventional git commits for this repo"
-  default_prompt: "Use $commit to split the diff into logical commits and write them in a consistent conventional-commit format."
+  default_prompt: "Use $commit to inspect the entire working tree, commit all changed files that belong in the repo history, split the work into logical commits by main behavior, and write them in a consistent conventional-commit format."
 
 policy:
   allow_implicit_invocation: true
