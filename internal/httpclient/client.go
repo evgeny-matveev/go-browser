@@ -2,6 +2,7 @@ package httpclient
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"gobrowser/internal/urlparser"
@@ -22,11 +23,10 @@ type Headers map[string]string
 var dial = net.Dial
 
 func Request(url urlparser.URL) (string, error) {
-	conn, err := dial("tcp", url.Host+":80")
+	conn, err := connect(url.Scheme, url.Host)
 	if err != nil {
 		return "", err
 	}
-
 	defer conn.Close()
 
 	request := prepareGetRequest(url.Path, url.Host)
@@ -51,6 +51,35 @@ func Request(url urlparser.URL) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func connect(scheme, host string) (net.Conn, error) {
+	var (
+		conn net.Conn
+		err  error
+	)
+
+	switch scheme {
+	case "http":
+		conn, err = dial("tcp", host+":80")
+		if err != nil {
+			return conn, err
+		}
+		return conn, nil
+	case "https":
+		conn, err = dial("tcp", host+":443")
+		if err != nil {
+			return conn, err
+		}
+		config := &tls.Config{ServerName: host}
+		tlsConn := tls.Client(conn, config)
+		if err := tlsConn.Handshake(); err != nil {
+			return conn, err
+		}
+		return tlsConn, nil
+	default:
+		return conn, fmt.Errorf("unsupported scheme: %s", scheme)
+	}
 }
 
 func prepareGetRequest(path string, host string) []byte {
