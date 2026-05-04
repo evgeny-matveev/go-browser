@@ -23,7 +23,7 @@ type Headers map[string]string
 var dial = net.Dial
 
 func Request(url urlparser.URL) (string, error) {
-	conn, err := connect(url.Scheme, url.Host)
+	conn, err := connect(url.Scheme, url.Host, url.Port)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +53,7 @@ func Request(url urlparser.URL) (string, error) {
 	return string(content), nil
 }
 
-func connect(scheme, host string) (net.Conn, error) {
+func connect(scheme, host, port string) (net.Conn, error) {
 	var (
 		conn net.Conn
 		err  error
@@ -61,13 +61,19 @@ func connect(scheme, host string) (net.Conn, error) {
 
 	switch scheme {
 	case "http":
-		conn, err = dial("tcp", host+":80")
+		if port == "" {
+			port = "80"
+		}
+		conn, err = dial("tcp", host+":"+port)
 		if err != nil {
 			return conn, err
 		}
 		return conn, nil
 	case "https":
-		conn, err = dial("tcp", host+":443")
+		if port == "" {
+			port = "443"
+		}
+		conn, err = dial("tcp", host+":"+port)
 		if err != nil {
 			return conn, err
 		}

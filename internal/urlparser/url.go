@@ -5,9 +5,11 @@ import (
 	"strings"
 )
 
+// Scheme://Host:Port/Path
 type URL struct {
 	Scheme string
 	Host   string
+	Port   string
 	Path   string
 }
 
@@ -26,9 +28,11 @@ func Parse(uri string) (URL, error) {
 	if hostname == "" {
 		return URL{}, errors.New("invalid URL: empty hostname")
 	}
+	hostname, port, _ := strings.Cut(hostname, ":")
 	u := URL{
 		Scheme: scheme,
 		Host:   hostname,
+		Port:   port,
 		Path:   "/" + path,
 	}
 	return u, nil
