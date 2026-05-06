@@ -89,8 +89,10 @@ func connect(scheme, host, port string) (net.Conn, error) {
 }
 
 func prepareGetRequest(path string, host string) []byte {
-	request := fmt.Sprintf("GET %s HTTP/1.0\r\n", path)
+	request := fmt.Sprintf("GET %s HTTP/1.1\r\n", path)
 	request += fmt.Sprintf("Host: %s\r\n", host)
+	request += fmt.Sprintf("Connection: close\r\n")
+	request += fmt.Sprintf("User-Agent: Mosaic\r\n")
 	request += "\r\n"
 	return []byte(request)
 }
