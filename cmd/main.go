@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"gobrowser/internal/filereader"
 	"gobrowser/internal/httpclient"
 	"gobrowser/internal/renderer"
 	"gobrowser/internal/urlparser"
@@ -21,7 +22,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	page, err := httpclient.Request(url)
+	var page string
+	switch u := url.(type) {
+	case *urlparser.WebURL:
+		page, err = httpclient.Request(*u)
+	case *urlparser.FileURL:
+		page, err = filereader.Read(*u)
+	default:
+		log.Fatalf("unsupported URL type: %T", u)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}

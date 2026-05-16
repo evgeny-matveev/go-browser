@@ -22,8 +22,8 @@ type Headers map[string]string
 
 var dial = net.Dial
 
-func Request(url urlparser.URL) (string, error) {
-	conn, err := connect(url.Scheme, url.Host, url.Port)
+func Request(url urlparser.WebURL) (string, error) {
+	conn, err := connect(url.SchemeValue, url.Host, url.Port)
 	if err != nil {
 		return "", err
 	}
