@@ -1,6 +1,12 @@
 package page
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
+
+// matches either a full tag (<...>) or a run of non-tag text
+var re = regexp.MustCompile(`<[^>]*>|[^<]+`)
 
 type Token interface{}
 
@@ -8,18 +14,18 @@ type Text struct {
 	Data string
 }
 
-func Lex(html string) []Token {
-	var buf strings.Builder
-	inTag := false
+type Tag struct {
+	Name string
+}
 
-	for _, r := range html {
-		if r == '<' {
-			inTag = true
-		} else if r == '>' {
-			inTag = false
-		} else if !inTag {
-			buf.WriteRune(r)
+func Lex(html string) []Token {
+	var tokens []Token
+	for _, chunk := range re.FindAllString(html, -1) {
+		if strings.HasPrefix(chunk, "<") {
+			tokens = append(tokens, Tag{Name: chunk[1 : len(chunk)-1]})
+		} else {
+			tokens = append(tokens, Text{Data: chunk})
 		}
 	}
-	return []Token{Text{Data: buf.String()}}
+	return tokens
 }
