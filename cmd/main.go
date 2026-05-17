@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"gobrowser/internal/filereader"
 	"gobrowser/internal/gui"
@@ -12,9 +11,12 @@ import (
 )
 
 func main() {
-	uri, err := parseUriFromArgs()
-	if err != nil {
-		log.Fatal(err)
+	uri := parseUriFromArgs()
+	b := gui.NewBrowser()
+
+	if len(uri) == 0 {
+		b.Render(page.Lex("Hello, World!"))
+		return
 	}
 
 	url, err := urlparser.Parse(uri)
@@ -37,15 +39,14 @@ func main() {
 
 	tokens := page.Lex(body)
 
-	b := gui.NewBrowser()
 	b.Render(tokens)
 }
 
-func parseUriFromArgs() (string, error) {
+func parseUriFromArgs() string {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) < 1 {
-		return "", errors.New("missing URL")
+		return ""
 	}
-	return args[0], nil
+	return args[0]
 }
