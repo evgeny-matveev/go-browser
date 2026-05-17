@@ -1,6 +1,7 @@
 package page
 
 import (
+	"html"
 	"regexp"
 	"strings"
 )
@@ -18,13 +19,13 @@ type Tag struct {
 	Name string
 }
 
-func Lex(html string) []Token {
+func Lex(body string) []Token {
 	var tokens []Token
-	for _, chunk := range re.FindAllString(html, -1) {
+	for _, chunk := range re.FindAllString(body, -1) {
 		if strings.HasPrefix(chunk, "<") {
 			tokens = append(tokens, Tag{Name: chunk[1 : len(chunk)-1]})
 		} else {
-			tokens = append(tokens, Text{Data: chunk})
+			tokens = append(tokens, Text{Data: html.UnescapeString(chunk)})
 		}
 	}
 	return tokens
