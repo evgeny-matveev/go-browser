@@ -41,8 +41,18 @@ func Request(url urlparser.WebURL) (string, error) {
 		return "", err
 	}
 
-	if err := handleHeaders(reader); err != nil {
+	headers, err := handleHeaders(reader)
+	if err != nil {
 		return "", err
+	}
+	if contentLengthStr, ok := headers["content-length"]; ok {
+		contentLength, err := strconv.Atoi(contentLengthStr)
+		if err != nil {
+			return "", errors.New("String convertion failed")
+		}
+		var contentBuf []byte
+		_, err = io.ReadAtLeast(reader, contentBuf, contentLength)
+		fmt.Println(string(contentBuf))
 	}
 
 	content, err := io.ReadAll(reader)
@@ -91,7 +101,7 @@ func connect(scheme, host, port string) (net.Conn, error) {
 func prepareGetRequest(path string, host string) []byte {
 	request := fmt.Sprintf("GET %s HTTP/1.1\r\n", path)
 	request += fmt.Sprintf("Host: %s\r\n", host)
-	request += fmt.Sprintf("Connection: close\r\n")
+	request += fmt.Sprintf("Connection: keep-alive\r\n")
 	request += fmt.Sprintf("User-Agent: Mosaic\r\n")
 	request += "\r\n"
 	return []byte(request)
@@ -145,23 +155,27 @@ func parseStatus(line string) (Status, error) {
 	}, nil
 }
 
-func handleHeaders(reader *bufio.Reader) error {
+func handleHeaders(reader *bufio.Reader) (Headers, error) {
 	headers, err := parseHeaders(reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(headers) > 0 {
 		if _, ok := headers["transfer-encoding"]; ok {
-			return errors.New("cannot handle response: transfer-encoding is not supported")
+			return nil, errors.New("cannot handle response: transfer-encoding is not supported")
 		}
 
 		if _, ok := headers["content-encoding"]; ok {
-			return errors.New("cannot handle response: content-encoding is not supported")
+			return nil, errors.New("cannot handle response: content-encoding is not supported")
+		}
+
+		if _, ok := headers["content-length"]; !ok {
+			return nil, errors.New("cannot handle response: content-length not found")
 		}
 	}
 
-	return nil
+	return headers, nil
 }
 
 func parseHeaders(reader *bufio.Reader) (Headers, error) {
